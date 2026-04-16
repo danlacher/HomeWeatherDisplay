@@ -1,0 +1,17 @@
+# Credentials — never commit
+secrets.h
+
+# Arduino build artifacts
+build/
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# General
+README.md

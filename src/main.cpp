@@ -11,6 +11,11 @@
 #include "bible.h"
 #include "display.h"
 
+#include <HardwareSerial.h>
+#define DEBUG_SERIAL Serial0
+
+HardwareSerial Serial0(0);
+
 // ============================================================
 //  RTC MEMORY  — survives deep sleep
 // ============================================================
@@ -21,20 +26,22 @@ RTC_DATA_ATTR RtcData rtc;
 // ============================================================
 
 static bool wifiConnect() {
-    Serial.printf("[wifi] Connecting to %s", WIFI_SSID);
+    Serial.printf("[wifi] Connecting to %s\n", WIFI_SSID);
     WiFi.mode(WIFI_STA);
+    WiFi.disconnect(true);
+    delay(100);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
     uint32_t start = millis();
     while (WiFi.status() != WL_CONNECTED) {
         if (millis() - start > WIFI_CONNECT_TIMEOUT_MS) {
-            Serial.println("\n[wifi] Timeout");
+            Serial.printf("[wifi] Timeout — last status: %d\n", WiFi.status());
             return false;
         }
         delay(250);
-        Serial.print(".");
+        Serial.printf("  status: %d\n", WiFi.status());
     }
-    Serial.printf("\n[wifi] Connected: %s\n", WiFi.localIP().toString().c_str());
+    Serial.printf("[wifi] Connected: %s\n", WiFi.localIP().toString().c_str());
     return true;
 }
 
@@ -118,14 +125,22 @@ static void goToSleep() {
     Serial.printf("[sleep] Going to sleep for %lu minutes\n",
                   REFRESH_INTERVAL_MS / 60000UL);
 
-    display.display.hibernate();          // put display into low-power mode
+    epd.hibernate();
     wifiDisconnect();
     delay(100);
 
+    // Wake on timer OR MENU button (GPIO2, active LOW)
     esp_sleep_enable_timer_wakeup(DEEP_SLEEP_US(REFRESH_INTERVAL_MS));
+    esp_sleep_enable_ext1_wakeup(1ULL << PIN_BTN_MENU, ESP_EXT1_WAKEUP_ANY_LOW);
+
     Serial.println("[sleep] Entering deep sleep...");
     Serial.flush();
     esp_deep_sleep_start();
+}
+
+static bool wokenByButton() {
+    esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
+    return (cause == ESP_SLEEP_WAKEUP_EXT1);
 }
 
 // ============================================================
@@ -146,9 +161,37 @@ static void firstBootInit() {
 //  SETUP
 // ============================================================
 void setup() {
+    pinMode(LED_BUILTIN, OUTPUT);
+    digitalWrite(LED_BUILTIN, HIGH);  // LED on = we reached setup()
+
+    delay(3000);
     Serial.begin(SERIAL_BAUD);
-    delay(200);
-    Serial.printf("\n\n=== Weather Dashboard Boot #%lu ===\n", rtc.bootCount);
+    delay(500);
+    Serial.println("=== CHECKPOINT 1: Serial OK ===");
+    Serial.flush();
+
+    if (rtc.bootCount == 0) {
+        firstBootInit();
+    } else {
+        rtc.bootCount++;
+    }
+    Serial.printf("=== CHECKPOINT 2: Boot count %lu ===\n", rtc.bootCount);
+    Serial.flush();
+
+    pinMode(PIN_EPD_PWR, OUTPUT);
+    digitalWrite(PIN_EPD_PWR, HIGH);
+    Serial.println("=== CHECKPOINT 3: PWR pin HIGH ===");
+    Serial.flush();
+    delay(100);
+
+    displayInit();
+    Serial.println("=== CHECKPOINT 4: Display init done ===");
+    Serial.flush();
+
+    bool wifiOk = wifiConnect();
+    Serial.printf("=== CHECKPOINT 5: WiFi %s ===\n", wifiOk ? "OK" : "FAILED");
+    Serial.flush();
+
 
     // First boot detection — bootCount will be 0 on power-on reset
     if (rtc.bootCount == 0) {
@@ -158,10 +201,14 @@ void setup() {
     }
 
     // Init display first so we can show something quickly
-    displayInit();
+    //displayInit();
+    Serial.println("=== CHECKPOINT 4: Display init SKIPPED ===");
+    Serial.flush();
+
 
     // ---- Connect WiFi ----
-    bool wifiOk = wifiConnect();
+    //bool wifiOk = wifiConnect();
+    wifiOk = wifiConnect();
     bool ntpOk  = false;
 
     if (wifiOk) {
@@ -219,17 +266,27 @@ void setup() {
     // ---- Decide which view to render ----
     uint8_t viewToRender;
 
+    static const uint8_t ALL_VIEWS[] = { VIEW_STANDARD, VIEW_FIVEDAY, VIEW_MULTICITY, VIEW_VERSE };
+    static const int ALL_VIEWS_COUNT = 4;
+
     if (showVerse && rtc.verseValid) {
         viewToRender = VIEW_VERSE;
-        // Record that we've shown the verse this hour
         time_t now = time(nullptr);
         struct tm* t = localtime(&now);
         rtc.lastVerseHour = t->tm_hour;
         rtc.lastVerseDay  = t->tm_yday;
         Serial.println("[main] Rendering: Bible verse");
+    } else if (wokenByButton()) {
+       // Button press — force advance through all 4 views for testing
+        //rtc.viewRotationIndex = (rtc.viewRotationIndex + 1) % 4;
+        //viewToRender = rtc.viewRotationIndex;
+
+        rtc.viewRotationIndex = (rtc.viewRotationIndex + 1) % ALL_VIEWS_COUNT;
+        viewToRender = ALL_VIEWS[rtc.viewRotationIndex];
+
+        Serial.printf("[main] Button press — rendering view: %d\n", viewToRender);
     } else {
         viewToRender = VIEW_ROTATION[rtc.viewRotationIndex];
-        // Advance rotation for next wake
         rtc.viewRotationIndex = nextViewIndex(rtc.viewRotationIndex);
         Serial.printf("[main] Rendering view: %d\n", viewToRender);
     }
@@ -238,15 +295,15 @@ void setup() {
     if (!rtc.weatherValid && viewToRender != VIEW_VERSE) {
         // No data at all — show a simple "waiting for data" message
         // using a minimal direct draw rather than a full view
-        display.display.setFullWindow();
-        display.display.firstPage();
+        epd.setFullWindow();
+        epd.firstPage();
         do {
-            display.display.fillScreen(GxEPD_WHITE);
-            display.display.setFont(nullptr);
-            display.display.setCursor(300, 130);
-            display.display.setTextColor(GxEPD_BLACK);
-            display.display.print("Connecting... waiting for data");
-        } while (display.display.nextPage());
+            epd.fillScreen(GxEPD_WHITE);
+            epd.setFont(nullptr);
+            epd.setCursor(300, 130);
+            epd.setTextColor(GxEPD_BLACK);
+            epd.print("Connecting... waiting for data");
+        } while (epd.nextPage());
     } else {
         switch (viewToRender) {
             case VIEW_STANDARD:
@@ -259,10 +316,16 @@ void setup() {
                 drawMultiCityView(rtc.cities);
                 break;
             case VIEW_VERSE:
-                drawVerseView(rtc.verse);
-                break;
-            default:
-                drawStandardView(rtc.current, rtc.forecast);
+                if (rtc.verseValid)
+                  drawVerseView(rtc.verse);
+                else {
+                    // Show placeholder verse for layout testing
+                    VerseOfDay placeholder;
+                    strncpy(placeholder.text, "For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you, plans to give you hope and a future.", sizeof(placeholder.text));
+                    strncpy(placeholder.reference, "Jeremiah 29:11", sizeof(placeholder.reference));
+                    strncpy(placeholder.translation, "AMP", sizeof(placeholder.translation));
+                    drawVerseView(placeholder);
+                }
                 break;
         }
 

@@ -72,7 +72,8 @@ static const CityConfig CITIES[NUM_CITIES] = {
 // ============================================================
 //  BIBLE  (api.bible)
 // ============================================================
-#define BIBLE_BASE_URL      "https://api.scripture.api.bible/v1"
+#define BIBLE_BASE_URL      "https://rest.api.bible/v1"
+#define BIBLE_PASSAGE_URL   BIBLE_BASE_URL "/bibles/" BIBLE_ID "/passages/"
 #define BIBLE_TRANSLATION   "AMP"
 
 // AMP Bible ID on api.bible  (id: a81b73293d3080c9-01  dblId: a81b73293d3080c9)
@@ -81,6 +82,9 @@ static const CityConfig CITIES[NUM_CITIES] = {
 // Passage fetch endpoint — verseId substituted at runtime
 // e.g. https://api.scripture.api.bible/v1/bibles/{id}/passages/JER.29.11
 #define BIBLE_PASSAGE_URL   BIBLE_BASE_URL "/bibles/" BIBLE_ID "/passages/"
+
+#define YOUVERSION_BASE_URL  "https://api.youversion.com/v1"
+#define YOUVERSION_VOTD_URL  YOUVERSION_BASE_URL "/verse_of_the_days/"
 
 // ============================================================
 //  UNITS & DISPLAY PREFS

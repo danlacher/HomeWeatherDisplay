@@ -1,7 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include <GxEPD2_BW.h>
-#include <GxEPD2_579_GDEY0579T93.h>
+#include <gdey/GxEPD2_579_GDEY0579T93.h>
 #include <Adafruit_GFX.h>
 #include "types.h"
 
@@ -29,4 +29,4 @@ void drawVerseView(const VerseOfDay& verse);
 void drawStaleIndicator();
 
 // Expose display object so main.cpp can call display.hibernate()
-extern GxEPD2_BW<GxEPD2_579_GDEY0579T93, GxEPD2_579_GDEY0579T93::HEIGHT> display;
+extern GxEPD2_BW<GxEPD2_579_GDEY0579T93, GxEPD2_579_GDEY0579T93::HEIGHT> epd;

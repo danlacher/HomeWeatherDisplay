@@ -10,6 +10,7 @@
 #include <Fonts/FreeSans9pt7b.h>        // small detail text
 #include <Fonts/FreeSerifItalic12pt7b.h> // verse body
 #include <Fonts/FreeSansBold9pt7b.h>    // small bold
+#include <Fonts/FreeSerifItalic18pt7b.h>
 
 // ============================================================
 //  DISPLAY OBJECT
@@ -18,7 +19,7 @@
 // ============================================================
 SPIClass epd_spi(HSPI);
 
-GxEPD2_BW<GxEPD2_579_GDEY0579T93, GxEPD2_579_GDEY0579T93::HEIGHT> display(
+GxEPD2_BW<GxEPD2_579_GDEY0579T93, GxEPD2_579_GDEY0579T93::HEIGHT> epd(
     GxEPD2_579_GDEY0579T93(PIN_EPD_CS, PIN_EPD_DC, PIN_EPD_RST, PIN_EPD_BUSY));
 
 // ============================================================
@@ -51,17 +52,17 @@ void displayInit() {
     digitalWrite(PIN_EPD_PWR, HIGH);
     delay(20);
 
-    epd_spi.begin(PIN_EPD_SCK, -1, PIN_EPD_MOSI, PIN_EPD_CS);
-    display.epd2.selectSPI(epd_spi, SPISettings(4000000, MSBFIRST, SPI_MODE0));
-    display.init(115200, true, 2, false);
-    display.setRotation(0);     // landscape, USB-C on left
-    display.setTextColor(CLR_BLACK);
-    display.setTextWrap(false);
+    epd_spi.begin(PIN_EPD_SCK, -1, PIN_EPD_MOSI, -1);
+    epd.epd2.selectSPI(epd_spi, SPISettings(4000000, MSBFIRST, SPI_MODE0));
+    epd.init(115200, true, 2, false);
+    epd.setRotation(0);     // landscape, USB-C on left
+    epd.setTextColor(CLR_BLACK);
+    epd.setTextWrap(false);
     Serial.println("[display] Init OK");
 }
 
 void displayClear() {
-    display.clearScreen();
+    epd.clearScreen();
 }
 
 // ============================================================
@@ -90,12 +91,12 @@ static void formatDate(uint32_t epoch, char* buf, size_t len) {
 // Draw top bar — shared across all views
 static void drawTopBar(const char* leftText, uint32_t epoch) {
     // Background line
-    display.drawFastHLine(0, TOPBAR_H, W, CLR_BLACK);
+    epd.drawFastHLine(0, TOPBAR_H, W, CLR_BLACK);
 
     // Left: location or view name
-    display.setFont(&FreeSansBold9pt7b);
-    display.setCursor(10, TOPBAR_H - 10);
-    display.print(leftText);
+    epd.setFont(&FreeSansBold9pt7b);
+    epd.setCursor(10, TOPBAR_H - 10);
+    epd.print(leftText);
 
     // Right: date + time
     char dateBuf[32], timeBuf[16], dtBuf[52];
@@ -103,40 +104,40 @@ static void drawTopBar(const char* leftText, uint32_t epoch) {
     formatTime(epoch, timeBuf, sizeof(timeBuf));
     snprintf(dtBuf, sizeof(dtBuf), "%s  |  %s", dateBuf, timeBuf);
 
-    display.setFont(&FreeSans9pt7b);
+    epd.setFont(&FreeSans9pt7b);
     int16_t x1, y1; uint16_t tw, th;
-    display.getTextBounds(dtBuf, 0, 0, &x1, &y1, &tw, &th);
-    display.setCursor(W - tw - 10, TOPBAR_H - 10);
-    display.print(dtBuf);
+    epd.getTextBounds(dtBuf, 0, 0, &x1, &y1, &tw, &th);
+    epd.setCursor(W - tw - 10, TOPBAR_H - 10);
+    epd.print(dtBuf);
 }
 
 // Draw a vertical divider line in the body area
 static void drawVDivider(int x) {
-    display.drawFastVLine(x, BODY_Y, BODY_H, CLR_BLACK);
+    epd.drawFastVLine(x, BODY_Y, BODY_H, CLR_BLACK);
 }
 
 // Draw a horizontal divider within a column region
 static void drawHDivider(int y, int x0, int x1) {
-    display.drawFastHLine(x0, y, x1 - x0, CLR_BLACK);
+    epd.drawFastHLine(x0, y, x1 - x0, CLR_BLACK);
 }
 
 // Centred text in a bounding box
 static void drawCentredText(const GFXfont* font, const char* str,
                             int bx, int by, int bw, int bh) {
-    display.setFont(font);
+    epd.setFont(font);
     int16_t x1, y1; uint16_t tw, th;
-    display.getTextBounds(str, 0, 0, &x1, &y1, &tw, &th);
+    epd.getTextBounds(str, 0, 0, &x1, &y1, &tw, &th);
     int cx = bx + (bw - (int)tw) / 2 - x1;
     int cy = by + (bh + (int)th) / 2;
-    display.setCursor(cx, cy);
-    display.print(str);
+    epd.setCursor(cx, cy);
+    epd.print(str);
 }
 
 // Small muted label above a value
 static void drawStatLabel(const char* label, int x, int y) {
-    display.setFont(&FreeSans9pt7b);
-    display.setCursor(x, y);
-    display.print(label);
+    epd.setFont(&FreeSans9pt7b);
+    epd.setCursor(x, y);
+    epd.print(label);
 }
 
 // ============================================================
@@ -148,8 +149,8 @@ static void drawWeatherIcon(uint8_t iconIdx, int cx, int cy, int r) {
     switch (iconIdx) {
         case ICON_CLEAR_DAY: {
             // Filled sun circle
-            display.fillCircle(cx, cy, r, CLR_BLACK);
-            display.fillCircle(cx, cy, r - 4, CLR_WHITE);
+            epd.fillCircle(cx, cy, r, CLR_BLACK);
+            epd.fillCircle(cx, cy, r - 4, CLR_WHITE);
             // Rays
             for (int i = 0; i < 8; i++) {
                 float ang = i * PI / 4.0f;
@@ -157,84 +158,84 @@ static void drawWeatherIcon(uint8_t iconIdx, int cx, int cy, int r) {
                 int y1 = cy + (r + 3) * sin(ang);
                 int x2 = cx + (r + 9) * cos(ang);
                 int y2 = cy + (r + 9) * sin(ang);
-                display.drawLine(x1, y1, x2, y2, CLR_BLACK);
+                epd.drawLine(x1, y1, x2, y2, CLR_BLACK);
             }
             break;
         }
         case ICON_CLEAR_NIGHT: {
             // Crescent moon
-            display.fillCircle(cx, cy, r, CLR_BLACK);
-            display.fillCircle(cx + r / 2, cy - r / 4, r, CLR_WHITE);
+            epd.fillCircle(cx, cy, r, CLR_BLACK);
+            epd.fillCircle(cx + r / 2, cy - r / 4, r, CLR_WHITE);
             break;
         }
         case ICON_FEW_CLOUDS:
         case ICON_SCATTERED: {
             // Small sun + cloud
-            display.fillCircle(cx - r / 3, cy - r / 3, r / 2, CLR_BLACK);
-            display.fillCircle(cx - r / 3, cy - r / 3, r / 2 - 3, CLR_WHITE);
+            epd.fillCircle(cx - r / 3, cy - r / 3, r / 2, CLR_BLACK);
+            epd.fillCircle(cx - r / 3, cy - r / 3, r / 2 - 3, CLR_WHITE);
             // Cloud body
-            display.fillRoundRect(cx - r, cy, r * 2, r, r / 2, CLR_BLACK);
-            display.fillCircle(cx - r / 3, cy, r / 2 + 2, CLR_BLACK);
-            display.fillCircle(cx + r / 3, cy, r / 2 + 4, CLR_BLACK);
-            display.fillRoundRect(cx - r + 2, cy + 2, r * 2 - 4, r - 4, r / 2 - 2, CLR_WHITE);
-            display.fillCircle(cx - r / 3, cy, r / 2, CLR_WHITE);
-            display.fillCircle(cx + r / 3, cy, r / 2 + 2, CLR_WHITE);
+            epd.fillRoundRect(cx - r, cy, r * 2, r, r / 2, CLR_BLACK);
+            epd.fillCircle(cx - r / 3, cy, r / 2 + 2, CLR_BLACK);
+            epd.fillCircle(cx + r / 3, cy, r / 2 + 4, CLR_BLACK);
+            epd.fillRoundRect(cx - r + 2, cy + 2, r * 2 - 4, r - 4, r / 2 - 2, CLR_WHITE);
+            epd.fillCircle(cx - r / 3, cy, r / 2, CLR_WHITE);
+            epd.fillCircle(cx + r / 3, cy, r / 2 + 2, CLR_WHITE);
             break;
         }
         case ICON_BROKEN: {
             // Simple cloud only
-            display.fillRoundRect(cx - r, cy - r / 3, r * 2, r, r / 2, CLR_BLACK);
-            display.fillCircle(cx - r / 3, cy - r / 3, r / 2 + 2, CLR_BLACK);
-            display.fillCircle(cx + r / 3, cy - r / 3, r / 2 + 4, CLR_BLACK);
-            display.fillRoundRect(cx - r + 2, cy - r / 3 + 2, r * 2 - 4, r - 4, r / 2 - 2, CLR_WHITE);
-            display.fillCircle(cx - r / 3, cy - r / 3, r / 2, CLR_WHITE);
-            display.fillCircle(cx + r / 3, cy - r / 3, r / 2 + 2, CLR_WHITE);
+            epd.fillRoundRect(cx - r, cy - r / 3, r * 2, r, r / 2, CLR_BLACK);
+            epd.fillCircle(cx - r / 3, cy - r / 3, r / 2 + 2, CLR_BLACK);
+            epd.fillCircle(cx + r / 3, cy - r / 3, r / 2 + 4, CLR_BLACK);
+            epd.fillRoundRect(cx - r + 2, cy - r / 3 + 2, r * 2 - 4, r - 4, r / 2 - 2, CLR_WHITE);
+            epd.fillCircle(cx - r / 3, cy - r / 3, r / 2, CLR_WHITE);
+            epd.fillCircle(cx + r / 3, cy - r / 3, r / 2 + 2, CLR_WHITE);
             break;
         }
         case ICON_SHOWER_RAIN:
         case ICON_RAIN: {
             // Cloud + rain drops
-            display.fillRoundRect(cx - r, cy - r / 2, r * 2, r - 4, r / 2, CLR_BLACK);
-            display.fillCircle(cx - r / 3, cy - r / 2, r / 2 + 2, CLR_BLACK);
-            display.fillCircle(cx + r / 3, cy - r / 2, r / 2 + 4, CLR_BLACK);
-            display.fillRoundRect(cx - r + 2, cy - r / 2 + 2, r * 2 - 4, r - 8, r / 2 - 2, CLR_WHITE);
-            display.fillCircle(cx - r / 3, cy - r / 2, r / 2, CLR_WHITE);
-            display.fillCircle(cx + r / 3, cy - r / 2, r / 2 + 2, CLR_WHITE);
+            epd.fillRoundRect(cx - r, cy - r / 2, r * 2, r - 4, r / 2, CLR_BLACK);
+            epd.fillCircle(cx - r / 3, cy - r / 2, r / 2 + 2, CLR_BLACK);
+            epd.fillCircle(cx + r / 3, cy - r / 2, r / 2 + 4, CLR_BLACK);
+            epd.fillRoundRect(cx - r + 2, cy - r / 2 + 2, r * 2 - 4, r - 8, r / 2 - 2, CLR_WHITE);
+            epd.fillCircle(cx - r / 3, cy - r / 2, r / 2, CLR_WHITE);
+            epd.fillCircle(cx + r / 3, cy - r / 2, r / 2 + 2, CLR_WHITE);
             // Drops
             for (int i = -1; i <= 1; i++)
-                display.drawLine(cx + i * (r / 2), cy + 4, cx + i * (r / 2) - 3, cy + 12, CLR_BLACK);
+                epd.drawLine(cx + i * (r / 2), cy + 4, cx + i * (r / 2) - 3, cy + 12, CLR_BLACK);
             break;
         }
         case ICON_THUNDERSTORM: {
             // Cloud + lightning bolt
-            display.fillRoundRect(cx - r, cy - r / 2, r * 2, r - 4, r / 2, CLR_BLACK);
-            display.fillCircle(cx - r / 3, cy - r / 2, r / 2 + 2, CLR_BLACK);
-            display.fillCircle(cx + r / 3, cy - r / 2, r / 2 + 4, CLR_BLACK);
-            display.fillRoundRect(cx - r + 2, cy - r / 2 + 2, r * 2 - 4, r - 8, r / 2 - 2, CLR_WHITE);
-            display.fillCircle(cx - r / 3, cy - r / 2, r / 2, CLR_WHITE);
-            display.fillCircle(cx + r / 3, cy - r / 2, r / 2 + 2, CLR_WHITE);
+            epd.fillRoundRect(cx - r, cy - r / 2, r * 2, r - 4, r / 2, CLR_BLACK);
+            epd.fillCircle(cx - r / 3, cy - r / 2, r / 2 + 2, CLR_BLACK);
+            epd.fillCircle(cx + r / 3, cy - r / 2, r / 2 + 4, CLR_BLACK);
+            epd.fillRoundRect(cx - r + 2, cy - r / 2 + 2, r * 2 - 4, r - 8, r / 2 - 2, CLR_WHITE);
+            epd.fillCircle(cx - r / 3, cy - r / 2, r / 2, CLR_WHITE);
+            epd.fillCircle(cx + r / 3, cy - r / 2, r / 2 + 2, CLR_WHITE);
             // Bolt
-            display.drawLine(cx + 4, cy + 2, cx - 2, cy + 10, CLR_BLACK);
-            display.drawLine(cx - 2, cy + 10, cx + 3, cy + 10, CLR_BLACK);
-            display.drawLine(cx + 3, cy + 10, cx - 4, cy + 20, CLR_BLACK);
+            epd.drawLine(cx + 4, cy + 2, cx - 2, cy + 10, CLR_BLACK);
+            epd.drawLine(cx - 2, cy + 10, cx + 3, cy + 10, CLR_BLACK);
+            epd.drawLine(cx + 3, cy + 10, cx - 4, cy + 20, CLR_BLACK);
             break;
         }
         case ICON_SNOW: {
             // Snowflake (6 lines)
             for (int i = 0; i < 6; i++) {
                 float ang = i * PI / 3.0f;
-                display.drawLine(cx, cy,
+                epd.drawLine(cx, cy,
                                  cx + r * cos(ang), cy + r * sin(ang),
                                  CLR_BLACK);
             }
-            display.fillCircle(cx, cy, 3, CLR_BLACK);
+            epd.fillCircle(cx, cy, 3, CLR_BLACK);
             break;
         }
         case ICON_MIST:
         default: {
             // Three horizontal hazy lines
             for (int i = -1; i <= 1; i++)
-                display.drawFastHLine(cx - r, cy + i * (r / 2), r * 2, CLR_BLACK);
+                epd.drawFastHLine(cx - r, cy + i * (r / 2), r * 2, CLR_BLACK);
             break;
         }
     }
@@ -261,12 +262,12 @@ static void drawSunArc(int cx, int cy, int arcR,
         int y1 = cy - arcR * sin(ang1);   // negative because Y increases downward
         int x2 = cx + arcR * cos(ang2);
         int y2 = cy - arcR * sin(ang2);
-        display.drawLine(x1, y1, x2, y2, CLR_BLACK);
+        epd.drawLine(x1, y1, x2, y2, CLR_BLACK);
     }
 
     // Small tick marks at sunrise and sunset ends
-    display.drawFastVLine(cx - arcR, cy - 4, 8, CLR_BLACK);
-    display.drawFastVLine(cx + arcR, cy - 4, 8, CLR_BLACK);
+    epd.drawFastVLine(cx - arcR, cy - 4, 8, CLR_BLACK);
+    epd.drawFastVLine(cx + arcR, cy - 4, 8, CLR_BLACK);
 
     // Sun dot position — only draw if between sunrise and sunset
     if (nowEpoch >= sunriseEpoch && nowEpoch <= sunsetEpoch && sunsetEpoch > sunriseEpoch) {
@@ -275,9 +276,9 @@ static void drawSunArc(int cx, int cy, int arcR,
         float ang = PI - progress * PI;                          // 180° -> 0°
         int sx = cx + arcR * cos(ang);
         int sy = cy - arcR * sin(ang);
-        display.fillCircle(sx, sy, 5, CLR_BLACK);   // solid sun dot
-        display.fillCircle(sx, sy, 3, CLR_WHITE);   // white centre for ring effect
-        display.fillCircle(sx, sy, 1, CLR_BLACK);   // inner dot
+        epd.fillCircle(sx, sy, 5, CLR_BLACK);   // solid sun dot
+        epd.fillCircle(sx, sy, 3, CLR_WHITE);   // white centre for ring effect
+        epd.fillCircle(sx, sy, 1, CLR_BLACK);   // inner dot
     }
 }
 
@@ -292,10 +293,10 @@ void drawStandardView(const CurrentWeather& wx, const ForecastDay forecast[5]) {
     time_t now = time(nullptr);
     char buf[64];
 
-    display.setFullWindow();
-    display.firstPage();
+    epd.setFullWindow();
+    epd.firstPage();
     do {
-        display.fillScreen(CLR_WHITE);
+        epd.fillScreen(CLR_WHITE);
 
         // Top bar
         drawTopBar(PRIMARY_CITY_NAME, (uint32_t)now);
@@ -314,66 +315,106 @@ void drawStandardView(const CurrentWeather& wx, const ForecastDay forecast[5]) {
         {
             int y0 = BODY_Y;
             drawHDivider(y0 + rowH, 0, COL1_W);
-            drawStatLabel("UV INDEX", 10, y0 + 14);
+
+            // Horizontally centre each item, keep original vertical positions
+            int16_t x1, y1; uint16_t tw, th;
+
+            // Label
+            epd.setFont(&FreeSans9pt7b);
+            epd.getTextBounds("UV INDEX", 0, 0, &x1, &y1, &tw, &th);
+            epd.setCursor(COL1_W/2 - tw/2 - x1, y0 + 14);
+            epd.print("UV INDEX");
+
+            // Big number
             snprintf(buf, sizeof(buf), "%d", wx.uvIndex);
-            display.setFont(&FreeSansBold24pt7b);
-            display.setCursor(10, y0 + rowH - 14);
-            display.print(buf);
+            epd.setFont(&FreeSansBold24pt7b);
+            epd.getTextBounds(buf, 0, 0, &x1, &y1, &tw, &th);
+            epd.setCursor(COL1_W/2 - tw/2 - x1, y0 + rowH - 22);
+            epd.print(buf);
+
+            // Sub-label
             const char* uvLabel = wx.uvIndex <= 2 ? "Low" :
-                                  wx.uvIndex <= 5 ? "Moderate" :
-                                  wx.uvIndex <= 7 ? "High" : "Very High";
-            display.setFont(&FreeSans9pt7b);
-            display.setCursor(10, y0 + rowH - 2);
-            display.print(uvLabel);
+                                wx.uvIndex <= 5 ? "Moderate" :
+                                wx.uvIndex <= 7 ? "High" : "Very High";
+            epd.setFont(&FreeSans9pt7b);
+            epd.getTextBounds(uvLabel, 0, 0, &x1, &y1, &tw, &th);
+            epd.setCursor(COL1_W/2 - tw/2 - x1, y0 + rowH - 4);
+            epd.print(uvLabel);
         }
         // Humidity
         {
             int y0 = BODY_Y + rowH;
             drawHDivider(y0 + rowH, 0, COL1_W);
-            drawStatLabel("HUMIDITY", 10, y0 + 14);
+            int16_t x1, y1; uint16_t tw, th;
+
+            epd.setFont(&FreeSans9pt7b);
+            epd.getTextBounds("HUMIDITY", 0, 0, &x1, &y1, &tw, &th);
+            epd.setCursor(COL1_W/2 - tw/2 - x1, y0 + 14);
+            epd.print("HUMIDITY");
+
             snprintf(buf, sizeof(buf), "%d%%", wx.humidity);
-            display.setFont(&FreeSansBold24pt7b);
-            display.setCursor(10, y0 + rowH - 14);
-            display.print(buf);
+            epd.setFont(&FreeSansBold24pt7b);
+            epd.getTextBounds(buf, 0, 0, &x1, &y1, &tw, &th);
+            epd.setCursor(COL1_W/2 - tw/2 - x1, y0 + rowH - 22);
+            epd.print(buf);
         }
         // Pressure
         {
             int y0 = BODY_Y + rowH * 2;
-            drawStatLabel("PRESSURE", 10, y0 + 14);
-            snprintf(buf, sizeof(buf), "%.1f", wx.pressure);
-            display.setFont(&FreeSansBold24pt7b);
-            display.setCursor(10, y0 + rowH - 14);
-            display.print(buf);
-            display.setFont(&FreeSans9pt7b);
-            display.setCursor(10, y0 + rowH - 2);
-            display.print("inHg");
-        }
+            int16_t x1, y1; uint16_t tw, th;
 
+            epd.setFont(&FreeSans9pt7b);
+            epd.getTextBounds("PRESSURE", 0, 0, &x1, &y1, &tw, &th);
+            epd.setCursor(COL1_W/2 - tw/2 - x1, y0 + 14);
+            epd.print("PRESSURE");
+
+            snprintf(buf, sizeof(buf), "%.1f", wx.pressure);
+            epd.setFont(&FreeSansBold24pt7b);
+            epd.getTextBounds(buf, 0, 0, &x1, &y1, &tw, &th);
+            epd.setCursor(COL1_W/2 - tw/2 - x1, y0 + rowH - 22);
+            epd.print(buf);
+
+            epd.setFont(&FreeSans9pt7b);
+            epd.getTextBounds("inHg", 0, 0, &x1, &y1, &tw, &th);
+            epd.setCursor(COL1_W/2 - tw/2 - x1, y0 + rowH - 4);
+            epd.print("inHg");
+        }
         // ---- COL 2: Temp block (upper) + Arc + Bottom row ----
         int col2MidY = BODY_Y + BODY_H / 2;
 
-        // Icon + Temp side by side, centred vertically in upper half
+        // Icon + Temp side by side, horizontally centred in COL2
         {
             int iconR = 22;
-            int iconX = COL2_X + 50;
-            int iconY = BODY_Y + BODY_H / 4;
-            drawWeatherIcon(wx.conditionIcon, iconX, iconY, iconR);
+            int iconY = BODY_Y + BODY_H / 4 - 15;
 
-            // Temp
+            // Measure temp string width
             snprintf(buf, sizeof(buf), "%d\xB0", (int)round(wx.temp));
-            display.setFont(&FreeSansBold24pt7b);
+            epd.setFont(&FreeSansBold24pt7b);
             int16_t x1, y1; uint16_t tw, th;
-            display.getTextBounds(buf, 0, 0, &x1, &y1, &tw, &th);
-            display.setCursor(iconX + iconR + 14, iconY + th / 2);
-            display.print(buf);
+            epd.getTextBounds(buf, 0, 0, &x1, &y1, &tw, &th);
 
-            // Feels like + condition below temp
+            // Total block = icon diameter + gap + text width
+            int iconDiam = iconR * 2;
+            int gap      = 12;
+            int blockW   = iconDiam + gap + (int)tw;
+
+            // Centre block within COL2
+            int blockStartX = COL2_X + (COL2_W - blockW) / 2;
+            int iconCX      = blockStartX + iconR;
+            int tempX       = blockStartX + iconDiam + gap - x1;
+
+            drawWeatherIcon(wx.conditionIcon, iconCX, iconY, iconR);
+
+            epd.setFont(&FreeSansBold24pt7b);
+            epd.setCursor(tempX, iconY + (int)th / 2);
+            epd.print(buf);
+
+            // Feels like + condition centred below
             snprintf(buf, sizeof(buf), "Feels like %d\xB0", (int)round(wx.feelsLike));
-            display.setFont(&FreeSans9pt7b);
-            display.setCursor(iconX + iconR + 14, iconY + th / 2 + 18);
-            display.print(buf);
-            display.setCursor(iconX + iconR + 14, iconY + th / 2 + 34);
-            display.print(wx.condition);
+            drawCentredText(&FreeSans9pt7b, buf,
+                            COL2_X, iconY + (int)th / 2 + 6, COL2_W, 18);
+            drawCentredText(&FreeSans9pt7b, wx.condition,
+                            COL2_X, iconY + (int)th / 2 + 22, COL2_W, 18);
         }
 
         // Divider between upper and lower halves of COL2
@@ -396,7 +437,7 @@ void drawStandardView(const CurrentWeather& wx, const ForecastDay forecast[5]) {
             // Sunrise
             char srBuf[12];
             formatTime(wx.sunrise, srBuf, sizeof(srBuf));
-            display.setFont(&FreeSans9pt7b);
+            epd.setFont(&FreeSans9pt7b);
             drawCentredText(&FreeSans9pt7b, "\x18 Sunrise",
                             COL2_X, rowY, thirdW, 16);
             drawCentredText(&FreeSansBold12pt7b, srBuf,
@@ -419,41 +460,71 @@ void drawStandardView(const CurrentWeather& wx, const ForecastDay forecast[5]) {
         }
 
         // ---- COL 3: Wind / Precip / Visibility ----
+        // Wind
         {
             int y0 = BODY_Y;
             drawHDivider(y0 + rowH, COL3_X, W);
-            drawStatLabel("WIND", COL3_X + 10, y0 + 14);
+            int16_t x1, y1; uint16_t tw, th;
+            int cx = COL3_X + COL1_W/2;
+
+            epd.setFont(&FreeSans9pt7b);
+            epd.getTextBounds("WIND", 0, 0, &x1, &y1, &tw, &th);
+            epd.setCursor(cx - tw/2 - x1, y0 + 14);
+            epd.print("WIND");
+
             snprintf(buf, sizeof(buf), "%.0f", wx.windSpeed);
-            display.setFont(&FreeSansBold24pt7b);
-            display.setCursor(COL3_X + 10, y0 + rowH - 14);
-            display.print(buf);
-            display.setFont(&FreeSans9pt7b);
+            epd.setFont(&FreeSansBold24pt7b);
+            epd.getTextBounds(buf, 0, 0, &x1, &y1, &tw, &th);
+            epd.setCursor(cx - tw/2 - x1, y0 + rowH - 22);
+            epd.print(buf);
+
             snprintf(buf, sizeof(buf), "mph %s", windDegToCardinal(wx.windDeg));
-            display.setCursor(COL3_X + 10, y0 + rowH - 2);
-            display.print(buf);
+            epd.setFont(&FreeSans9pt7b);
+            epd.getTextBounds(buf, 0, 0, &x1, &y1, &tw, &th);
+            epd.setCursor(cx - tw/2 - x1, y0 + rowH - 4);
+            epd.print(buf);
         }
+        // Precip Chance
         {
             int y0 = BODY_Y + rowH;
             drawHDivider(y0 + rowH, COL3_X, W);
-            drawStatLabel("PRECIP CHANCE", COL3_X + 10, y0 + 14);
+            int16_t x1, y1; uint16_t tw, th;
+            int cx = COL3_X + COL1_W/2;
+
+            epd.setFont(&FreeSans9pt7b);
+            epd.getTextBounds("PRECIP CHANCE", 0, 0, &x1, &y1, &tw, &th);
+            epd.setCursor(cx - tw/2 - x1, y0 + 14);
+            epd.print("PRECIP CHANCE");
+
             snprintf(buf, sizeof(buf), "%d%%", wx.precipChance);
-            display.setFont(&FreeSansBold24pt7b);
-            display.setCursor(COL3_X + 10, y0 + rowH - 14);
-            display.print(buf);
+            epd.setFont(&FreeSansBold24pt7b);
+            epd.getTextBounds(buf, 0, 0, &x1, &y1, &tw, &th);
+            epd.setCursor(cx - tw/2 - x1, y0 + rowH - 22);
+            epd.print(buf);
         }
+        // Visibility
         {
             int y0 = BODY_Y + rowH * 2;
-            drawStatLabel("VISIBILITY", COL3_X + 10, y0 + 14);
-            snprintf(buf, sizeof(buf), "%.0f", wx.visibility);
-            display.setFont(&FreeSansBold24pt7b);
-            display.setCursor(COL3_X + 10, y0 + rowH - 14);
-            display.print(buf);
-            display.setFont(&FreeSans9pt7b);
-            display.setCursor(COL3_X + 10, y0 + rowH - 2);
-            display.print("mi");
-        }
+            int16_t x1, y1; uint16_t tw, th;
+            int cx = COL3_X + COL1_W/2;
 
-    } while (display.nextPage());
+            epd.setFont(&FreeSans9pt7b);
+            epd.getTextBounds("VISIBILITY", 0, 0, &x1, &y1, &tw, &th);
+            epd.setCursor(cx - tw/2 - x1, y0 + 14);
+            epd.print("VISIBILITY");
+
+            snprintf(buf, sizeof(buf), "%.0f", wx.visibility);
+            epd.setFont(&FreeSansBold24pt7b);
+            epd.getTextBounds(buf, 0, 0, &x1, &y1, &tw, &th);
+            epd.setCursor(cx - tw/2 - x1, y0 + rowH - 22);
+            epd.print(buf);
+
+            epd.setFont(&FreeSans9pt7b);
+            epd.getTextBounds("mi", 0, 0, &x1, &y1, &tw, &th);
+            epd.setCursor(cx - tw/2 - x1, y0 + rowH - 4);
+            epd.print("mi");
+        }
+    } while (epd.nextPage());
 }
 
 // ============================================================
@@ -465,25 +536,25 @@ void drawFiveDayView(const CurrentWeather& wx, const ForecastDay forecast[5]) {
     char buf[32];
     const int COL_W = W / 5;   // 158px
 
-    display.setFullWindow();
-    display.firstPage();
+    epd.setFullWindow();
+    epd.firstPage();
     do {
-        display.fillScreen(CLR_WHITE);
+        epd.fillScreen(CLR_WHITE);
         drawTopBar(PRIMARY_CITY_NAME, (uint32_t)now);
 
         for (int i = 0; i < 5; i++) {
             int x0 = i * COL_W;
-            if (i > 0) display.drawFastVLine(x0, BODY_Y, BODY_H, CLR_BLACK);
+            if (i > 0) epd.drawFastVLine(x0, BODY_Y, BODY_H, CLR_BLACK);
 
             const ForecastDay& d = forecast[i];
             int cx = x0 + COL_W / 2;
 
             // Day name
-            display.setFont(&FreeSansBold12pt7b);
+            epd.setFont(&FreeSansBold12pt7b);
             drawCentredText(&FreeSansBold12pt7b, d.day, x0, BODY_Y, COL_W, 24);
 
             // Divider under day name
-            display.drawFastHLine(x0, BODY_Y + 26, COL_W, CLR_BLACK);
+            epd.drawFastHLine(x0, BODY_Y + 26, COL_W, CLR_BLACK);
 
             // Icon
             drawWeatherIcon(d.conditionIcon, cx, BODY_Y + 58, 20);
@@ -497,24 +568,24 @@ void drawFiveDayView(const CurrentWeather& wx, const ForecastDay forecast[5]) {
             drawCentredText(&FreeSans9pt7b, buf, x0, BODY_Y + 124, COL_W, 18);
 
             // Divider
-            display.drawFastHLine(x0, BODY_Y + 146, COL_W, CLR_BLACK);
+            epd.drawFastHLine(x0, BODY_Y + 146, COL_W, CLR_BLACK);
 
             // Detail rows
-            int detY = BODY_Y + 158;
+            int detY = BODY_Y + 178;
             int detX = x0 + 8;
 
             snprintf(buf, sizeof(buf), "Rain: %d%%", d.precipChance);
-            display.setFont(&FreeSans9pt7b);
-            display.setCursor(detX, detY);      display.print(buf);
+            epd.setFont(&FreeSans9pt7b);
+            epd.setCursor(detX, detY);      epd.print(buf);
 
             snprintf(buf, sizeof(buf), "Wind: %d mph", d.windSpeed);
-            display.setCursor(detX, detY + 18); display.print(buf);
+            epd.setCursor(detX, detY + 18); epd.print(buf);
 
             snprintf(buf, sizeof(buf), "Cloud: %d%%", d.cloudPct);
-            display.setCursor(detX, detY + 36); display.print(buf);
+            epd.setCursor(detX, detY + 36); epd.print(buf);
         }
 
-    } while (display.nextPage());
+    } while (epd.nextPage());
 }
 
 // ============================================================
@@ -526,10 +597,10 @@ void drawMultiCityView(const CityWeather cities[NUM_CITIES]) {
     char buf[48];
     const int ROW_H = BODY_H / NUM_CITIES;
 
-    display.setFullWindow();
-    display.firstPage();
+    epd.setFullWindow();
+    epd.firstPage();
     do {
-        display.fillScreen(CLR_WHITE);
+        epd.fillScreen(CLR_WHITE);
         drawTopBar("Multiple Locations", (uint32_t)now);
 
         for (int i = 0; i < NUM_CITIES; i++) {
@@ -537,51 +608,51 @@ void drawMultiCityView(const CityWeather cities[NUM_CITIES]) {
             const CityConfig&  cfg = CITIES[i];
 
             int y0 = BODY_Y + i * ROW_H;
-            if (i > 0) display.drawFastHLine(0, y0, W, CLR_BLACK);
+            if (i > 0) epd.drawFastHLine(0, y0, W, CLR_BLACK);
 
             int midY = y0 + ROW_H / 2;
 
-            // City name + label (left block, 160px wide)
-            display.setFont(&FreeSansBold12pt7b);
-            display.setCursor(14, midY - 4);
-            display.print(cfg.name);
-            display.setFont(&FreeSans9pt7b);
-            display.setCursor(14, midY + 14);
-            display.print(cfg.label);
+            // City name + label (left block, 240px wide)
+            epd.setFont(&FreeSansBold12pt7b);
+            epd.setCursor(14, midY - 4);
+            epd.print(cfg.name);
+            epd.setFont(&FreeSans9pt7b);
+            epd.setCursor(14, midY + 14);
+            epd.print(cfg.label);
 
-            // Icon
-            drawWeatherIcon(c.conditionIcon, 200, midY, 18);
+            // Icon — pushed right to clear longest city name
+            drawWeatherIcon(c.conditionIcon, 260, midY, 18);
 
             // Temp
             snprintf(buf, sizeof(buf), "%d\xB0", (int)round(c.temp));
-            display.setFont(&FreeSansBold24pt7b);
-            display.setCursor(242, midY + 12);
-            display.print(buf);
+            epd.setFont(&FreeSansBold24pt7b);
+            epd.setCursor(290, midY + 12);
+            epd.print(buf);
 
             // Detail (right of temp, separated by thin line)
-            display.drawFastVLine(370, y0 + 6, ROW_H - 12, CLR_BLACK);
+            epd.drawFastVLine(370, y0 + 6, ROW_H - 12, CLR_BLACK);
 
-            display.setFont(&FreeSans9pt7b);
+            epd.setFont(&FreeSans9pt7b);
             snprintf(buf, sizeof(buf), "Rain: %.2f in", c.rainAmt > 0 ? c.rainAmt : 0.0f);
-            display.setCursor(382, midY - 6);
-            display.print(buf);
+            epd.setCursor(382, midY - 6);
+            epd.print(buf);
 
             snprintf(buf, sizeof(buf), "Wind: %.0f mph %s",
                      c.windSpeed, windDegToCardinal(c.windDeg));
-            display.setCursor(382, midY + 12);
-            display.print(buf);
+            epd.setCursor(382, midY + 12);
+            epd.print(buf);
 
             // Local time (top right of row)
             char timeBuf[16];
             formatTime((uint32_t)now, timeBuf, sizeof(timeBuf));
-            display.setFont(&FreeSans9pt7b);
+            epd.setFont(&FreeSans9pt7b);
             int16_t x1, y1; uint16_t tw, th;
-            display.getTextBounds(timeBuf, 0, 0, &x1, &y1, &tw, &th);
-            display.setCursor(W - tw - 10, y0 + 14);
-            display.print(timeBuf);
+            epd.getTextBounds(timeBuf, 0, 0, &x1, &y1, &tw, &th);
+            epd.setCursor(W - tw - 10, y0 + 14);
+            epd.print(timeBuf);
         }
 
-    } while (display.nextPage());
+    } while (epd.nextPage());
 }
 
 // ============================================================
@@ -592,26 +663,26 @@ void drawVerseView(const VerseOfDay& verse) {
     time_t now = time(nullptr);
     char buf[48];
 
-    display.setFullWindow();
-    display.firstPage();
+    epd.setFullWindow();
+    epd.firstPage();
     do {
-        display.fillScreen(CLR_WHITE);
+        epd.fillScreen(CLR_WHITE);
         drawTopBar("\x04 Verse of the Day", (uint32_t)now);  // \x04 = diamond glyph
 
         // Large opening quote — decorative, drawn as big " character
-        display.setFont(&FreeSansBold24pt7b);
-        display.setCursor(18, BODY_Y + 60);
-        display.print("\"");
+        epd.setFont(&FreeSansBold24pt7b);
+        epd.setCursor(18, BODY_Y + 60);
+        epd.print("\"");
 
         // Verse text — wrapped manually in bounding box
         // Box: x=70 to x=720, y=BODY_Y+8, height=BODY_H-30
         int textX   = 70;
         int textMaxW = 720 - textX;
-        int textY   = BODY_Y + 28;
-        int lineH   = 22;
+        int textY   = BODY_Y + 45;
+        int lineH   = 30;
 
-        display.setFont(&FreeSerifItalic12pt7b);
-
+        epd.setFont(&FreeSerifItalic18pt7b);
+        
         // Simple word-wrap
         String verseStr = String(verse.text);
         String line = "";
@@ -624,10 +695,10 @@ void drawVerseView(const VerseOfDay& verse) {
             if (ch == ' ' || ci == (int)verseStr.length()) {
                 String testLine = line.isEmpty() ? word : (line + " " + word);
                 int16_t x1, y1; uint16_t tw, th;
-                display.getTextBounds(testLine.c_str(), 0, 0, &x1, &y1, &tw, &th);
+                epd.getTextBounds(testLine.c_str(), 0, 0, &x1, &y1, &tw, &th);
                 if ((int)tw > textMaxW && !line.isEmpty()) {
-                    display.setCursor(textX, curY);
-                    display.print(line);
+                    epd.setCursor(textX, curY);
+                    epd.print(line);
                     curY += lineH;
                     line = word;
                 } else {
@@ -641,18 +712,20 @@ void drawVerseView(const VerseOfDay& verse) {
         }
         // Print last line
         if (!line.isEmpty() && curY <= BODY_Y + BODY_H - lineH * 2) {
-            display.setCursor(textX, curY);
-            display.print(line);
+            epd.setCursor(textX, curY);
+            epd.print(line);
             curY += lineH;
         }
 
         // Reference + translation
         snprintf(buf, sizeof(buf), "— %s  (%s)", verse.reference, verse.translation);
-        display.setFont(&FreeSansBold9pt7b);
-        display.setCursor(textX, curY + 10);
-        display.print(buf);
+        epd.setFont(&FreeSansBold9pt7b);
+        int16_t x1, y1; uint16_t tw, th;
+        epd.getTextBounds(buf, 0, 0, &x1, &y1, &tw, &th);
+        epd.setCursor(W - (int)tw - 20, curY + 10);
+        epd.print(buf);
 
-    } while (display.nextPage());
+    } while (epd.nextPage());
 }
 
 // ============================================================
@@ -661,14 +734,14 @@ void drawVerseView(const VerseOfDay& verse) {
 //  using partial window to avoid a full redraw
 // ============================================================
 void drawStaleIndicator() {
-    display.setPartialWindow(W - 28, 4, 24, 28);
-    display.firstPage();
+    epd.setPartialWindow(W - 28, 4, 24, 28);
+    epd.firstPage();
     do {
-        display.fillRect(W - 28, 4, 24, 28, CLR_BLACK);
-        display.setFont(&FreeSansBold12pt7b);
-        display.setTextColor(CLR_WHITE);
-        display.setCursor(W - 22, 26);
-        display.print("!");
-        display.setTextColor(CLR_BLACK);
-    } while (display.nextPage());
+        epd.fillRect(W - 28, 4, 24, 28, CLR_BLACK);
+        epd.setFont(&FreeSansBold12pt7b);
+        epd.setTextColor(CLR_WHITE);
+        epd.setCursor(W - 22, 26);
+        epd.print("!");
+        epd.setTextColor(CLR_BLACK);
+    } while (epd.nextPage());
 }

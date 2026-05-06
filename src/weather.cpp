@@ -5,6 +5,9 @@
 #include <ArduinoJson.h>
 #include <time.h>
 
+#include <HardwareSerial.h>
+extern HardwareSerial Serial0;
+
 // ============================================================
 //  INTERNAL HELPERS
 // ============================================================

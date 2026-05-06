@@ -1,5 +1,6 @@
 # Credentials — never commit
-secrets.h
+src/secrets.h
+README.md
 
 # Arduino build artifacts
 build/
@@ -12,6 +13,3 @@ build/
 
 # macOS
 .DS_Store
-
-# General
-README.md

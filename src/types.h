@@ -29,6 +29,7 @@ struct CurrentWeather {
     uint8_t  conditionIcon;         // mapped icon index (see icons.h)
     uint32_t sunrise;               // unix epoch UTC
     uint32_t sunset;                // unix epoch UTC
+    uint32_t nextSunrise;           // tomorrow's sunrise epoch for moon arc
 };
 
 // ============================================================

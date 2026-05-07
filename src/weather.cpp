@@ -77,6 +77,7 @@ static float parseRainMm(JsonObjectConst obj, const char* key) {
 static void parseCurrent(JsonObjectConst cur,
                          JsonArrayConst  hourly,
                          JsonObjectConst daily0,
+                         JsonObjectConst daily1,
                          CurrentWeather& out) {
     out.temp         = cur["temp"]       | 0.0f;
     out.feelsLike    = cur["feels_like"] | 0.0f;
@@ -87,6 +88,7 @@ static void parseCurrent(JsonObjectConst cur,
     out.windDeg      = cur["wind_deg"]   | 0;
     out.sunrise      = cur["sunrise"]    | 0;
     out.sunset       = cur["sunset"]     | 0;
+    out.nextSunrise  = daily1["sunrise"] | 0;
     out.visibility   = metersToMiles(cur["visibility"] | 0.0f);
     out.pressure     = hpaToInHg(cur["pressure"] | 1013.0f);
     out.rainAmt      = parseRainMm(cur, "rain");
@@ -206,7 +208,7 @@ static bool fetchAndParse(float lat, float lon,
     JsonArrayConst  daily   = doc["daily"];
 
     if (current && forecast) {
-        parseCurrent(cur, hourly, daily[0], *current);
+        parseCurrent(cur, hourly, daily[0], daily[1], *current);
         parseForecast(daily, forecast);
     }
 

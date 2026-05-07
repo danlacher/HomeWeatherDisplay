@@ -2,8 +2,6 @@
 
 A personal Wi-Fi connected e-ink weather dashboard built on the Elecrow CrowPanel 5.79" ESP32-S3 display. Shows current weather conditions, a 5-day forecast, multi-city snapshots, and a daily Bible verse — all on a crisp black-and-white e-ink display with a 7-minute refresh cycle.
 
-![HomeWeatherDisplay](docs/display_photo.jpg)
-
 ---
 
 ## Features

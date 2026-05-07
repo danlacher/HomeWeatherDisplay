@@ -249,36 +249,76 @@ static void drawWeatherIcon(uint8_t iconIdx, int cx, int cy, int r) {
 // ============================================================
 static void drawSunArc(int cx, int cy, int arcR,
                        uint32_t sunriseEpoch, uint32_t sunsetEpoch,
-                       uint32_t nowEpoch) {
-    // Arc: left end = sunrise (180°), top = solar noon (90°), right = sunset (0°)
-    // We draw from 180° to 0° (upper semicircle)
+                       uint32_t nextSunriseEpoch, uint32_t nowEpoch) {
 
-    // Draw arc using short line segments
-    const int STEPS = 60;
-    for (int i = 0; i < STEPS; i++) {
-        float ang1 = PI - (float)i       / STEPS * PI;
-        float ang2 = PI - (float)(i + 1) / STEPS * PI;
-        int x1 = cx + arcR * cos(ang1);
-        int y1 = cy - arcR * sin(ang1);   // negative because Y increases downward
-        int x2 = cx + arcR * cos(ang2);
-        int y2 = cy - arcR * sin(ang2);
-        epd.drawLine(x1, y1, x2, y2, CLR_BLACK);
-    }
+    bool isNight = (nowEpoch > sunsetEpoch || nowEpoch < sunriseEpoch);
 
-    // Small tick marks at sunrise and sunset ends
-    epd.drawFastVLine(cx - arcR, cy - 4, 8, CLR_BLACK);
-    epd.drawFastVLine(cx + arcR, cy - 4, 8, CLR_BLACK);
+    if (!isNight) {
+        // ---- DAYTIME: solid arc ----
+        const int STEPS = 60;
+        for (int i = 0; i < STEPS; i++) {
+            float ang1 = PI - (float)i       / STEPS * PI;
+            float ang2 = PI - (float)(i + 1) / STEPS * PI;
+            int x1 = cx + arcR * cos(ang1);
+            int y1 = cy - arcR * sin(ang1);
+            int x2 = cx + arcR * cos(ang2);
+            int y2 = cy - arcR * sin(ang2);
+            epd.drawLine(x1, y1, x2, y2, CLR_BLACK);
+        }
 
-    // Sun dot position — only draw if between sunrise and sunset
-    if (nowEpoch >= sunriseEpoch && nowEpoch <= sunsetEpoch && sunsetEpoch > sunriseEpoch) {
-        float progress = (float)(nowEpoch - sunriseEpoch) /
-                         (float)(sunsetEpoch - sunriseEpoch);   // 0.0 -> 1.0
-        float ang = PI - progress * PI;                          // 180° -> 0°
-        int sx = cx + arcR * cos(ang);
-        int sy = cy - arcR * sin(ang);
-        epd.fillCircle(sx, sy, 5, CLR_BLACK);   // solid sun dot
-        epd.fillCircle(sx, sy, 3, CLR_WHITE);   // white centre for ring effect
-        epd.fillCircle(sx, sy, 1, CLR_BLACK);   // inner dot
+        // Tick marks
+        epd.drawFastVLine(cx - arcR, cy - 4, 8, CLR_BLACK);
+        epd.drawFastVLine(cx + arcR, cy - 4, 8, CLR_BLACK);
+
+        // Sun dot
+        if (nowEpoch >= sunriseEpoch && nowEpoch <= sunsetEpoch
+            && sunsetEpoch > sunriseEpoch) {
+            float progress = (float)(nowEpoch - sunriseEpoch) /
+                             (float)(sunsetEpoch - sunriseEpoch);
+            float ang = PI - progress * PI;
+            int sx = cx + arcR * cos(ang);
+            int sy = cy - arcR * sin(ang);
+            epd.fillCircle(sx, sy, 5, CLR_BLACK);
+            epd.fillCircle(sx, sy, 3, CLR_WHITE);
+            epd.fillCircle(sx, sy, 1, CLR_BLACK);
+        }
+
+    } else {
+        // ---- NIGHTTIME: dashed arc ----
+        const int STEPS = 60;
+        for (int i = 0; i < STEPS; i++) {
+            // Skip every other segment for dashed effect
+            if (i % 3 == 2) continue;
+            float ang1 = PI - (float)i       / STEPS * PI;
+            float ang2 = PI - (float)(i + 1) / STEPS * PI;
+            int x1 = cx + arcR * cos(ang1);
+            int y1 = cy - arcR * sin(ang1);
+            int x2 = cx + arcR * cos(ang2);
+            int y2 = cy - arcR * sin(ang2);
+            epd.drawLine(x1, y1, x2, y2, CLR_BLACK);
+        }
+
+        // Tick marks
+        epd.drawFastVLine(cx - arcR, cy - 4, 8, CLR_BLACK);
+        epd.drawFastVLine(cx + arcR, cy - 4, 8, CLR_BLACK);
+
+        // Moon dot position along arc
+        // Arc runs from sunset (left=180°) to next sunrise (right=0°)
+        uint32_t arcStart = sunsetEpoch;
+        uint32_t arcEnd   = nextSunriseEpoch;
+
+        if (arcEnd > arcStart && nowEpoch >= arcStart) {
+            float progress = (float)(nowEpoch - arcStart) /
+                             (float)(arcEnd - arcStart);
+            progress = constrain(progress, 0.0f, 1.0f);
+            float ang = PI - progress * PI;
+            int mx = cx + arcR * cos(ang);
+            int my = cy - arcR * sin(ang);
+
+            // Filled crescent moon
+            epd.fillCircle(mx, my, 6, CLR_BLACK);          // full circle
+            epd.fillCircle(mx + 3, my - 2, 5, CLR_WHITE);  // offset cutout = crescent
+        }
     }
 }
 
@@ -426,7 +466,8 @@ void drawStandardView(const CurrentWeather& wx, const ForecastDay forecast[5]) {
             int arcCY = BODY_Y + BODY_H - 14;
             int arcR  = 52;
             drawSunArc(arcCX, arcCY, arcR,
-                       wx.sunrise, wx.sunset, (uint32_t)now);
+                        wx.sunrise, wx.sunset,
+                        wx.nextSunrise, (uint32_t)now);
         }
 
         // Bottom row: Sunrise | Rain | Sunset  (below arc labels)
@@ -594,8 +635,9 @@ void drawFiveDayView(const CurrentWeather& wx, const ForecastDay forecast[5]) {
 // ============================================================
 void drawMultiCityView(const CityWeather cities[NUM_CITIES]) {
     time_t now = time(nullptr);
-    char buf[48];
-    const int ROW_H = BODY_H / NUM_CITIES;
+    char buf[32];
+    const int ROW_H = BODY_H / 3;
+    const int HALF_W = W / 2;          // 396px per column
 
     epd.setFullWindow();
     epd.firstPage();
@@ -603,53 +645,37 @@ void drawMultiCityView(const CityWeather cities[NUM_CITIES]) {
         epd.fillScreen(CLR_WHITE);
         drawTopBar("Multiple Locations", (uint32_t)now);
 
+        // Vertical divider between columns
+        epd.drawFastVLine(HALF_W, BODY_Y, BODY_H, CLR_BLACK);
+
         for (int i = 0; i < NUM_CITIES; i++) {
             const CityWeather& c   = cities[i];
             const CityConfig&  cfg = CITIES[i];
 
-            int y0 = BODY_Y + i * ROW_H;
-            if (i > 0) epd.drawFastHLine(0, y0, W, CLR_BLACK);
-
+            int col  = i / 3;           // 0 = left, 1 = right
+            int row  = i % 3;           // 0, 1, 2
+            int x0   = col * HALF_W;
+            int y0   = BODY_Y + row * ROW_H;
             int midY = y0 + ROW_H / 2;
 
-            // City name + label (left block, 240px wide)
-            epd.setFont(&FreeSansBold12pt7b);
-            epd.setCursor(14, midY - 4);
-            epd.print(cfg.name);
-            epd.setFont(&FreeSans9pt7b);
-            epd.setCursor(14, midY + 14);
-            epd.print(cfg.label);
+            // Row divider
+            if (row > 0) epd.drawFastHLine(x0, y0, HALF_W, CLR_BLACK);
 
-            // Icon — pushed right to clear longest city name
-            drawWeatherIcon(c.conditionIcon, 260, midY, 18);
+            // City name
+            epd.setFont(&FreeSansBold12pt7b);
+            epd.setCursor(x0 + 14, midY + 6);
+            epd.print(cfg.name);
+
+            // Icon
+            drawWeatherIcon(c.conditionIcon, x0 + HALF_W - 110, midY, 18);
 
             // Temp
             snprintf(buf, sizeof(buf), "%d\xB0", (int)round(c.temp));
             epd.setFont(&FreeSansBold24pt7b);
-            epd.setCursor(290, midY + 12);
-            epd.print(buf);
-
-            // Detail (right of temp, separated by thin line)
-            epd.drawFastVLine(370, y0 + 6, ROW_H - 12, CLR_BLACK);
-
-            epd.setFont(&FreeSans9pt7b);
-            snprintf(buf, sizeof(buf), "Rain: %.2f in", c.rainAmt > 0 ? c.rainAmt : 0.0f);
-            epd.setCursor(382, midY - 6);
-            epd.print(buf);
-
-            snprintf(buf, sizeof(buf), "Wind: %.0f mph %s",
-                     c.windSpeed, windDegToCardinal(c.windDeg));
-            epd.setCursor(382, midY + 12);
-            epd.print(buf);
-
-            // Local time (top right of row)
-            char timeBuf[16];
-            formatTime((uint32_t)now, timeBuf, sizeof(timeBuf));
-            epd.setFont(&FreeSans9pt7b);
             int16_t x1, y1; uint16_t tw, th;
-            epd.getTextBounds(timeBuf, 0, 0, &x1, &y1, &tw, &th);
-            epd.setCursor(W - tw - 10, y0 + 14);
-            epd.print(timeBuf);
+            epd.getTextBounds(buf, 0, 0, &x1, &y1, &tw, &th);
+            epd.setCursor(x0 + HALF_W - (int)tw - 14 - x1, midY + 12);
+            epd.print(buf);
         }
 
     } while (epd.nextPage());

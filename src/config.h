@@ -39,7 +39,7 @@ static const uint8_t VIEW_ROTATION[NUM_VIEWS] = { 0, 1, 0, 3 };
 // ============================================================
 //  LOCATIONS
 // ============================================================
-#define NUM_CITIES                  3
+#define NUM_CITIES                  6
 
 // Primary location — used on Standard Day view
 #define PRIMARY_CITY_NAME           "Pentwater, MI"
@@ -57,9 +57,12 @@ struct CityConfig {
 };
 
 static const CityConfig CITIES[NUM_CITIES] = {
-    { "Pentwater, MI",     "Pentwater",    43.7814f,  -86.4327f, "America/Detroit" },
-    { "Grand Valley, MI",  "Grand Valley", 43.0667f,  -85.5833f, "America/Detroit" },
-    { "Alma, MI",          "Alma",         43.3789f,  -84.6602f, "America/Detroit" },
+    { "Pentwater, MI",    "Pentwater",    43.7814f,  -86.4327f, "America/Detroit" },
+    { "Grand Valley, MI", "Grand Valley", 43.0667f,  -85.5833f, "America/Detroit" },
+    { "Alma, MI",         "Alma",         43.3789f,  -84.6602f, "America/Detroit" },
+    { "Midland, MI",      "Midland",      43.6156f,  -84.2472f, "America/Detroit" },
+    { "Aberdeen, SD",     "Aberdeen",     45.4647f,  -98.4865f, "America/Chicago" },
+    { "Valley City, ND",  "Valley City",  46.9238f,  -98.0037f, "America/Chicago" },
 };
 
 // ============================================================

@@ -16,6 +16,10 @@ A personal Wi-Fi connected e-ink weather dashboard built on the Elecrow CrowPane
 
 ---
 
+![Sample screenshot of main display.](docs/SampleScreenshot.png)
+
+---
+
 ## Hardware
 
 | Component | Details |
@@ -222,9 +226,7 @@ This means the display renders immediately on wake from cached data, with a fres
 
 ## Roadmap
 
-- [ ] Fast button wake — skip fetch, render from cache immediately
 - [ ] Night mode — reduced refresh rate between 11pm–6am
-- [ ] Moon phase on Standard view
 - [ ] OTA firmware updates over WiFi
 - [ ] Battery operation with power consumption optimisation
 
